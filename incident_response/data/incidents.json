@@ -1,0 +1,66 @@
+[
+  {
+    "id": "INC-1042",
+    "title": "checkout-service latency spike from payment-gateway timeouts",
+    "keywords": ["latency", "timeout", "downstream", "payment-gateway", "cascading", "p99", "circuit breaker"],
+    "root_cause": "A downstream payment-gateway dependency started timing out after a provider-side deploy; checkout-service had no circuit breaker so threads blocked waiting on the dependency, exhausting its own thread pool.",
+    "fix_applied": "Added a circuit breaker with a 2s timeout around the payment-gateway client and enabled request hedging; paged the vendor.",
+    "tags": ["latency", "dependency", "checkout-service", "payment-gateway"]
+  },
+  {
+    "id": "INC-0981",
+    "title": "auth-service 5xx spike from expired TLS certificate",
+    "keywords": ["certificate", "tls", "expired", "handshake", "5xx", "auth", "ssl"],
+    "root_cause": "The internal TLS certificate used by auth-service's downstream identity provider client expired at midnight UTC; all handshake attempts failed with SSL errors.",
+    "fix_applied": "Rotated the certificate via the secrets manager and added a 30-day expiry alert.",
+    "tags": ["certificate", "auth-service", "tls"]
+  },
+  {
+    "id": "INC-0877",
+    "title": "payment-db connection pool exhaustion after leaky deploy",
+    "keywords": ["connection pool", "exhaustion", "leak", "deploy", "database", "max_connections", "postgres"],
+    "root_cause": "A deploy introduced a code path that opened a DB connection per request without releasing it on an early-return branch, slowly exhausting the pool until new requests queued and timed out.",
+    "fix_applied": "Rolled back the deploy, then shipped a fix using a context-managed connection acquire/release; added pool-utilization alerting.",
+    "tags": ["database", "connection-pool", "deploy", "payment-db"]
+  },
+  {
+    "id": "INC-0755",
+    "title": "recommendation-service OOM from unbounded in-memory cache",
+    "keywords": ["memory", "oom", "leak", "cache", "heap", "gc"],
+    "root_cause": "An in-process LRU cache had no size bound; under a traffic spike it grew until the process hit its memory limit and was OOM-killed repeatedly.",
+    "fix_applied": "Bounded the cache size and moved to a shared Redis cache with TTL eviction.",
+    "tags": ["memory", "cache", "recommendation-service"]
+  },
+  {
+    "id": "INC-0690",
+    "title": "checkout-service 5xx spike from cache stampede after cache-cluster restart",
+    "keywords": ["cache", "stampede", "thundering herd", "restart", "cold cache", "latency"],
+    "root_cause": "A routine cache-cluster maintenance restart cleared the cache; the resulting flood of cache-miss requests overwhelmed the origin database simultaneously (thundering herd).",
+    "fix_applied": "Added request coalescing and jittered TTLs; warmed the cache before maintenance windows.",
+    "tags": ["cache", "checkout-service", "database"]
+  },
+  {
+    "id": "INC-0612",
+    "title": "image-upload-service disk-full from unrotated logs",
+    "keywords": ["disk", "full", "logs", "rotation", "storage", "enospc"],
+    "root_cause": "Debug logging was left on after an incident investigation and log rotation was misconfigured, filling the local disk and causing write failures.",
+    "fix_applied": "Restored log rotation config, reduced log level, and added disk-utilization alerting.",
+    "tags": ["disk", "logs", "image-upload-service"]
+  },
+  {
+    "id": "INC-0533",
+    "title": "auth-service error spike from bad config push (rate limit misconfigured)",
+    "keywords": ["config", "misconfiguration", "rate limit", "deploy", "rollback", "5xx"],
+    "root_cause": "A config push accidentally set the auth-service rate limiter to 1 req/s per key instead of 1000, causing most legitimate traffic to be throttled.",
+    "fix_applied": "Rolled back the config, added config-diff review gate for rate-limit changes.",
+    "tags": ["config", "auth-service", "rate-limit"]
+  },
+  {
+    "id": "INC-0421",
+    "title": "checkout-service degraded from noisy-neighbor CPU saturation",
+    "keywords": ["cpu", "saturation", "noisy neighbor", "throttling", "latency"],
+    "root_cause": "A co-located batch job on the same node pool consumed most of the shared CPU quota, throttling checkout-service pods and inflating latency.",
+    "fix_applied": "Moved the batch job to a dedicated node pool and set CPU requests/limits on all workloads.",
+    "tags": ["cpu", "checkout-service", "infrastructure"]
+  }
+]
