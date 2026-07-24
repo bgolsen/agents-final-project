@@ -16,6 +16,8 @@ from google.adk.models.llm_response import LlmResponse
 from google.genai import types
 from pydantic import BaseModel
 
+from incident_response.tracing import logger
+
 
 def extract_prompt_text(llm_request: LlmRequest) -> str:
     chunks: list[str] = []
@@ -37,3 +39,26 @@ def model_to_llm_response(model_obj: BaseModel) -> LlmResponse:
             role="model", parts=[types.Part(text=model_obj.model_dump_json())]
         )
     )
+
+
+def on_tool_error(*, tool, args, tool_context, error):
+    """Shared `on_tool_error_callback`: instead of letting a failed tool call
+    crash the whole agent invocation, hand the model a structured error so it
+    can adapt within its own reasoning -- note the gap, lower confidence,
+    proceed with partial information -- exactly like a human on-call engineer
+    would when one signal is unavailable.
+
+    NOTE: ADK invokes per-agent `on_tool_error_callback`s with the tool
+    arguments under the keyword `args` (not `tool_args`, which is only used
+    for the separate plugin-manager callback variant) -- verified against
+    `google/adk/flows/llm_flows/functions.py::_run_on_tool_error_callbacks`.
+    """
+    logger.warning("agent tool '%s' failed with args %s: %s", tool.name, args, error)
+    return {
+        "error": str(error),
+        "guidance": (
+            "This data source is temporarily unavailable. Do not retry it. "
+            "Proceed with whatever other data you have, and explicitly record "
+            "this gap (lower your confidence / note it as unresolved)."
+        ),
+    }

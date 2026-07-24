@@ -50,7 +50,10 @@ API (port 8000) as subprocesses, lets you pick one of 3 canned incident
 scenarios, runs triage → diagnosis → planning, prints each agent's structured
 output, **stops and prompts you** to approve/reject/modify the remediation plan
 (the HITL checkpoint), then executes and prints the post-mortem. Processes are
-torn down automatically on exit.
+torn down automatically on exit. Each subprocess's own stdout/stderr (model
+calls, ADK's internal retry-on-validation-failure noise, etc.) is written to
+`logs/<agent>.log` instead of the terminal, so the demo output stays readable
+— check those files if something looks wrong.
 
 Useful flags:
 

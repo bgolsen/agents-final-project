@@ -9,6 +9,7 @@ from incident_response.agents.common import (
     extract_field,
     extract_prompt_text,
     model_to_llm_response,
+    on_tool_error,
 )
 from incident_response.config import settings
 from incident_response.data.telemetry import (
@@ -39,6 +40,11 @@ suspected production incident. Your job:
 Only report what the data supports. Do not diagnose root cause -- that is a
 different agent's job; you are triage only. Always echo the given incident_id
 back in your report.
+
+IMPORTANT: always set `degraded_mode` to `false`. That field is reserved for
+the system's own automatic fallback path (used only when you are completely
+unavailable) and must never be set to `true` by you -- record any data gaps
+in `data_gaps` instead, that is the correct place for them.
 """
 
 
@@ -140,4 +146,5 @@ def build_agent() -> LlmAgent:
         tools=[get_metrics_snapshot, get_recent_logs],
         output_schema=TriageReport,
         on_model_error_callback=_on_model_error,
+        on_tool_error_callback=on_tool_error,
     )

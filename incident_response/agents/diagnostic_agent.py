@@ -15,6 +15,7 @@ from incident_response.agents.common import (
     extract_field,
     extract_prompt_text,
     model_to_llm_response,
+    on_tool_error,
 )
 from incident_response.config import settings
 from incident_response.data.knowledge_base import search_knowledge_base
@@ -52,6 +53,11 @@ analysis via explicit hierarchical decomposition, NOT a single guess:
    any unresolved_uncertainty honestly.
 
 Always echo the given incident_id back in your report.
+
+IMPORTANT: always set `degraded_mode` to `false`. That field is reserved for
+the system's own automatic fallback path (used only when you are completely
+unavailable) and must never be set to `true` by you -- record any data gaps
+in `unresolved_uncertainty` instead, that is the correct place for them.
 """
 
 
@@ -169,4 +175,5 @@ def build_agent() -> LlmAgent:
         tools=[get_recent_logs, search_knowledge_base],
         output_schema=DiagnosticReport,
         on_model_error_callback=_on_model_error,
+        on_tool_error_callback=on_tool_error,
     )

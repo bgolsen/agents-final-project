@@ -17,6 +17,7 @@ import json
 import subprocess
 import sys
 import time
+from pathlib import Path
 from typing import Optional
 
 import httpx
@@ -26,17 +27,31 @@ from incident_response.data.scenarios import SCENARIOS
 
 COORDINATOR_BASE = f"http://{settings.coordinator_host}:{settings.coordinator_port}"
 AGENTS = ["monitoring", "diagnostic", "remediation", "postmortem"]
+LOGS_DIR = Path(__file__).resolve().parent.parent / "logs"
 
 _procs: list[subprocess.Popen] = []
+_log_files: list = []
 
 
 def _spawn_all() -> None:
-    for agent in AGENTS:
-        p = subprocess.Popen([sys.executable, "-m", "incident_response.a2a_server", agent])
+    # Agent/coordinator subprocess output (including ADK's internal
+    # self-correction retries on structured-output validation, which are
+    # noisy but not failures -- the request still succeeds) goes to per
+    # process log files instead of the terminal, so the demo output stays
+    # readable. See logs/<name>.log if something looks wrong.
+    LOGS_DIR.mkdir(exist_ok=True)
+
+    def _spawn(name: str, args: list[str]) -> None:
+        log_file = open(LOGS_DIR / f"{name}.log", "w", encoding="utf-8")
+        _log_files.append(log_file)
+        p = subprocess.Popen([sys.executable, *args], stdout=log_file, stderr=subprocess.STDOUT)
         _procs.append(p)
-    p = subprocess.Popen([sys.executable, "-m", "incident_response.api"])
-    _procs.append(p)
+
+    for agent in AGENTS:
+        _spawn(agent, ["-m", "incident_response.a2a_server", agent])
+    _spawn("coordinator", ["-m", "incident_response.api"])
     atexit.register(_shutdown)
+    print(f"(agent/coordinator logs are being written to {LOGS_DIR}/)")
 
 
 def _shutdown() -> None:
@@ -48,6 +63,8 @@ def _shutdown() -> None:
             p.wait(timeout=5)
         except subprocess.TimeoutExpired:
             p.kill()
+    for f in _log_files:
+        f.close()
 
 
 def _wait_healthy(timeout_s: float = 30.0) -> None:

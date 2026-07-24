@@ -48,6 +48,11 @@ diagnostic report shows low confidence or unresolved_uncertainty, prefer
 lower-risk actions and say so in risk_summary.
 
 Always echo the given incident_id back in your report.
+
+IMPORTANT: always set `degraded_mode` to `false`. That field is reserved for
+the system's own automatic fallback path (used only when you are completely
+unavailable) and must never be set to `true` by you -- record any concerns
+about data quality in `risk_summary` instead.
 """
 
 

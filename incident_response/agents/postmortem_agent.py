@@ -41,8 +41,15 @@ Write a structured post-mortem:
 - lessons_learned: 1-3 concrete, specific observations.
 - action_items: 1-3 concrete follow-ups (e.g. add an alert, add a runbook).
 
-Be honest about degraded_mode / data_gaps / unresolved_uncertainty if the
-inputs mention them -- do not paper over gaps.
+If the inputs mention data gaps or unresolved uncertainty, be honest about
+them in your narrative (timeline/lessons_learned/action_items) -- do not
+paper over gaps.
+
+IMPORTANT: your own output's `degraded_mode` field is a *different* thing --
+it is reserved for the system's own automatic fallback path (used only when
+you, the Postmortem Agent, are completely unavailable) and must always be set
+to `false` by you, even if the upstream reports you are summarizing mention
+gaps or degraded_mode themselves.
 
 Always echo the given incident_id back.
 """

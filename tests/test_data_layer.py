@@ -50,7 +50,7 @@ def test_chaos_injection_fails_then_succeeds(monkeypatch):
     # payment-db scenario configures get_metrics_snapshot to fail exactly once.
     from incident_response.data import telemetry
 
-    monkeypatch.setattr(telemetry, "_call_counts", {})
+    monkeypatch.setattr("incident_response.data.chaos._call_counts", {})
     with pytest.raises(TelemetryUnavailableError):
         telemetry.get_metrics_snapshot("payment-db")
     # second call for the same service succeeds
@@ -63,9 +63,7 @@ def test_execute_action_chaos_resolves_scenario_from_plain_service_name(monkeypa
     # "service:step_id" call-key, which must NOT be used to look up the
     # scenario (only plain service names match `Scenario.primary_service`/
     # `affected_services`) -- otherwise chaos silently never fires.
-    from incident_response.data import telemetry
-
-    monkeypatch.setattr(telemetry, "_call_counts", {})
+    monkeypatch.setattr("incident_response.data.chaos._call_counts", {})
     with pytest.raises(TelemetryUnavailableError):
         simulate_execute_action("S1", "payment-db", "recycle the pool")
     # retry succeeds
@@ -73,14 +71,24 @@ def test_execute_action_chaos_resolves_scenario_from_plain_service_name(monkeypa
     assert result["status"] == "success"
 
 
-def test_chaos_can_be_disabled(monkeypatch):
-    from incident_response.data import telemetry
+def test_knowledge_base_chaos_resolves_scenario_from_query_text(monkeypatch):
+    # auth-cert-expiry scenario configures search_knowledge_base to fail once;
+    # the KB tool has no `service` argument, so the scenario must be resolved
+    # from the query text itself.
+    monkeypatch.setattr("incident_response.data.chaos._call_counts", {})
+    with pytest.raises(TelemetryUnavailableError):
+        search_knowledge_base("auth-service handshake failure certificate")
+    # retry succeeds
+    results = search_knowledge_base("auth-service handshake failure certificate")
+    assert results
 
+
+def test_chaos_can_be_disabled(monkeypatch):
     class _NoChaosSettings:
         chaos_mode = False
 
-    monkeypatch.setattr(telemetry, "settings", _NoChaosSettings())
-    monkeypatch.setattr(telemetry, "_call_counts", {})
+    monkeypatch.setattr("incident_response.data.chaos.settings", _NoChaosSettings())
+    monkeypatch.setattr("incident_response.data.chaos._call_counts", {})
     # would normally fail on the first call; disabled chaos means it never raises
     get_recent_logs("checkout-service")
     get_recent_logs("checkout-service")

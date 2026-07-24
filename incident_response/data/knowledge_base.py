@@ -12,6 +12,7 @@ import json
 from pathlib import Path
 from typing import TypedDict
 
+from incident_response.data.chaos import maybe_fail, scenario_for_text
 from incident_response.data.text_utils import tokenize
 
 _DB_PATH = Path(__file__).parent / "incidents.json"
@@ -45,7 +46,12 @@ def search_knowledge_base(query: str, top_k: int = 3) -> list[dict]:
     Returns:
         A list of past-incident records (id, title, root_cause, fix_applied,
         tags) ordered from most to least relevant, each with a `score` field.
+
+    Raises:
+        SimulatedBackendUnavailableError: the knowledge base is unreachable
+            (simulated transient failure).
     """
+    maybe_fail("search_knowledge_base", scenario_for_text(query), subject=query[:60])
     query_tokens = tokenize(query)
     scored = []
     for inc in _INCIDENTS:

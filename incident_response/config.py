@@ -24,7 +24,7 @@ def _int(name: str, default: int) -> int:
 @dataclass(frozen=True)
 class Settings:
     google_api_key: str = os.getenv("GOOGLE_API_KEY", "")
-    adk_model: str = os.getenv("ADK_MODEL", "gemini-2.0-flash")
+    adk_model: str = os.getenv("ADK_MODEL", "gemini-2.5-flash")
 
     langsmith_tracing: bool = _bool("LANGSMITH_TRACING", True)
     langsmith_api_key: str = os.getenv("LANGSMITH_API_KEY", "")
