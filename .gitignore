@@ -10,3 +10,10 @@ runs/
 node_modules/
 .DS_Store
 *.log
+
+# PDF build intermediates (regenerate via .pdfbuild/build_pdfs.py); the
+# built PDFs themselves (README.pdf etc.) live at the repo root and ARE tracked.
+.pdfbuild/*.html
+.pdfbuild/*.svg
+.pdfbuild/*.mmd
+.pdfbuild/*.png

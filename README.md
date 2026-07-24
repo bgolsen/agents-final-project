@@ -2,7 +2,12 @@
 
 Capstone project, Track 2 (Multi-Agent Incident Response System). See
 [`ARCHITECTURE.md`](ARCHITECTURE.md) for the full design writeup, diagrams, and
-technical analysis. This README is setup/run instructions only.
+technical analysis, and [`SCRIPT.md`](SCRIPT.md) for the demo video script.
+This README is setup/run instructions only. PDF versions of all three
+(`README.pdf`, `ARCHITECTURE.pdf`, `SCRIPT.pdf`) are included at the repo root
+for easier offline reading; regenerate them after editing the `.md` sources
+with `python .pdfbuild/build_pdfs.py` (requires Chrome and `npx` for
+mermaid-cli — see the script for details).
 
 A simulated production incident comes in as an alert. Four **Google ADK**
 agents, each its own **A2A** server, collaborate under a rule-based Coordinator
