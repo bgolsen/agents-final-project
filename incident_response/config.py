@@ -21,6 +21,11 @@ def _int(name: str, default: int) -> int:
     return int(val) if val else default
 
 
+def _float(name: str, default: float) -> float:
+    val = os.getenv(name)
+    return float(val) if val else default
+
+
 @dataclass(frozen=True)
 class Settings:
     google_api_key: str = os.getenv("GOOGLE_API_KEY", "")
@@ -42,6 +47,11 @@ class Settings:
     chaos_mode: bool = _bool("CHAOS_MODE", True)
 
     n8n_alert_webhook_url: str = os.getenv("N8N_ALERT_WEBHOOK_URL", "")
+
+    # Optional mode: skip the HITL gate for well-understood, low-stakes plans.
+    # Off by default -- every incident stops for a human unless explicitly enabled.
+    auto_approve_low_risk: bool = _bool("AUTO_APPROVE_LOW_RISK", False)
+    auto_approve_confidence_threshold: float = _float("AUTO_APPROVE_CONFIDENCE_THRESHOLD", 0.75)
 
     @property
     def has_llm_credentials(self) -> bool:

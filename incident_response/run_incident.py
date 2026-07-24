@@ -27,6 +27,10 @@ from incident_response.data.scenarios import SCENARIOS
 
 COORDINATOR_BASE = f"http://{settings.coordinator_host}:{settings.coordinator_port}"
 AGENTS = ["monitoring", "diagnostic", "remediation", "postmortem"]
+# Statuses where the pipeline has stopped moving on its own -- either it
+# needs a human (awaiting_approval) or it already reached an end state
+# (e.g. auto-approved by the low-risk policy, so there's nothing left to ask).
+STOPPED_STATUSES = {"awaiting_approval", "closed", "rejected", "failed"}
 LOGS_DIR = Path(__file__).resolve().parent.parent / "logs"
 
 _procs: list[subprocess.Popen] = []
@@ -226,15 +230,16 @@ def main() -> None:
         state = resp.json()
 
         # If routed through n8n, the webhook may ack immediately; poll for the
-        # coordinator to actually reach the approval gate.
+        # coordinator to actually stop somewhere -- either awaiting_approval,
+        # or already resolved (e.g. AUTO_APPROVE_LOW_RISK closed it outright).
         incident_id = state.get("incident_id")
-        if incident_id and state.get("status") not in ("awaiting_approval", "failed"):
+        if incident_id and state.get("status") not in STOPPED_STATUSES:
             deadline = time.monotonic() + 120
             while time.monotonic() < deadline:
                 r = client.get(f"{COORDINATOR_BASE}/incidents/{incident_id}")
                 if r.status_code == 200:
                     state = r.json()
-                    if state["status"] in ("awaiting_approval", "failed"):
+                    if state["status"] in STOPPED_STATUSES:
                         break
                 time.sleep(1)
 
@@ -250,10 +255,23 @@ def main() -> None:
         _print_diagnosis(state["diagnosis"])
         _print_plan(state["plan"])
 
-        decision = _hitl_prompt(state["plan"], args.auto_approve)
-        resp = client.post(f"{COORDINATOR_BASE}/incidents/{incident_id}/decision", json=decision)
-        resp.raise_for_status()
-        final_state = resp.json()
+        if state["status"] == "awaiting_approval":
+            decision = _hitl_prompt(state["plan"], args.auto_approve)
+            resp = client.post(f"{COORDINATOR_BASE}/incidents/{incident_id}/decision", json=decision)
+            resp.raise_for_status()
+            final_state = resp.json()
+        else:
+            # Already resolved -- e.g. the coordinator's AUTO_APPROVE_LOW_RISK
+            # policy cleared it without a human, so there's no prompt to show.
+            final_state = state
+            print("=" * 70)
+            print("HUMAN-IN-THE-LOOP CHECKPOINT -- SKIPPED")
+            print("=" * 70)
+            d = final_state.get("decision") or {}
+            print(f"The coordinator resolved this automatically: {d.get('decision')} by {d.get('reviewer')}")
+            if d.get("notes"):
+                print(f"  {d['notes']}")
+            print()
 
         print("\n" + "=" * 70)
         print(f"EXECUTION RESULT (status={final_state['status']})")

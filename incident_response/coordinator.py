@@ -232,6 +232,52 @@ async def run_postmortem(state: IncidentState) -> PostmortemDoc:
     )
 
 
+def _auto_approval_decision(state: IncidentState) -> ApprovalDecision | None:
+    """Optional mode (`AUTO_APPROVE_LOW_RISK`, off by default): skip the HITL
+    gate only for plans that are well-understood *and* low-stakes. Every one
+    of these has to hold, not just one:
+      - none of triage/diagnosis/plan fell back to degraded (rule-based) mode
+        -- that reasoning is deliberately weaker and shouldn't self-certify
+      - the leading root-cause hypothesis clears a confidence threshold
+      - every step in the goal that would run is 'low' risk
+
+    Anything short of all three still stops for a human -- this is meant to
+    auto-clear the boring, obvious cases, not to quietly widen what "low
+    risk" covers.
+    """
+    if not settings.auto_approve_low_risk:
+        return None
+    assert state.triage and state.diagnosis and state.plan
+
+    if state.triage.degraded_mode or state.diagnosis.degraded_mode or state.plan.degraded_mode:
+        return None
+
+    leading = next(
+        (h for h in state.diagnosis.hypotheses if h.id == state.diagnosis.leading_hypothesis_id),
+        None,
+    )
+    if leading is None or leading.confidence < settings.auto_approve_confidence_threshold:
+        return None
+
+    goal = next(
+        (g for g in state.plan.goals if g.goal == state.plan.ranked_recommendation),
+        state.plan.goals[0] if state.plan.goals else None,
+    )
+    if goal is None or not goal.steps or any(step.risk != "low" for step in goal.steps):
+        return None
+
+    return ApprovalDecision(
+        decision="approve",
+        reviewer="system (auto-approved: low risk)",
+        notes=(
+            f"Auto-approved by policy: leading hypothesis confidence "
+            f"{leading.confidence:.2f} >= {settings.auto_approve_confidence_threshold:.2f} "
+            f"threshold, all steps in '{goal.goal}' are low-risk, and no stage "
+            f"ran in degraded mode."
+        ),
+    )
+
+
 def _select_goal(plan: RemediationPlan, decision: ApprovalDecision) -> RemediationGoal:
     if decision.decision == "modify" and decision.modified_goal:
         for goal in plan.goals:
@@ -316,6 +362,15 @@ async def run_to_approval(state: IncidentState) -> IncidentState:
     state.status = "awaiting_approval"
     state.updated_at = _now()
     save_state(state)
+
+    auto_decision = _auto_approval_decision(state)
+    if auto_decision is not None:
+        logger.info(
+            "coordinator: incident %s auto-approved by low-risk policy (%s)",
+            state.incident_id, auto_decision.notes,
+        )
+        return await resume_after_decision(state, auto_decision, langsmith_extra=extra)
+
     return state
 
 
