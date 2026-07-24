@@ -71,7 +71,14 @@ modify) the human took and which calls fell back to degraded mode. *Tradeoff*:
 `@traceable` is a no-op without an API key, so tracing is additive, not a hard
 dependency — the system runs (and this was relied on for local testing in this
 sandbox, which had no LangSmith/Gemini credentials) even when nothing is
-configured, it just isn't remotely observable.
+configured, it just isn't remotely observable. A second, local complement to
+LangSmith needs no API key at all: the coordinator serves a live HTML view
+(`GET /dashboard`, `GET /incidents/{id}/report`, see `api/report.py`) that
+renders every agent's actual structured output -- the diagnostic
+decomposition and ranked hypotheses with cited evidence, the remediation
+goal/step plan, the HITL decision, execution results, the postmortem -- and
+auto-refreshes while the incident is still in flight, since it reads the same
+mutable `IncidentState` object the coordinator is actively updating.
 
 **Why not CrewAI or LangGraph too?** Two frameworks were required; four were used
 because each targets a different concern (agent runtime, wire protocol, external

@@ -23,7 +23,7 @@
             {
               "id": "cfg-1",
               "name": "coordinator_base",
-              "value": "http://localhost:8000",
+              "value": "http://host.docker.internal:8000",
               "type": "string"
             },
             {
@@ -85,7 +85,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ incident_id: $json.incident_id, status: $json.status, routed_to: $json.routing_channel }) }}",
+        "responseBody": "={{ JSON.stringify({ incident_id: $('Compute Routing').item.json.incident_id, status: $('Compute Routing').item.json.status, routed_to: $('Compute Routing').item.json.routing_channel }) }}",
         "options": {}
       },
       "id": "node-ack-webhook",

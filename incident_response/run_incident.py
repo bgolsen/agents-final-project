@@ -219,6 +219,7 @@ def main() -> None:
 
     with httpx.Client(timeout=120.0) as client:
         target = settings.n8n_alert_webhook_url or f"{COORDINATOR_BASE}/incidents"
+        print(f"Live dashboard (open this now to watch each agent's reasoning as it happens): {COORDINATOR_BASE}/dashboard\n")
         print(f"Filing alert for scenario '{scenario_id}' -> {target}\n")
         resp = client.post(target, json={"scenario_id": scenario_id})
         resp.raise_for_status()
@@ -243,7 +244,8 @@ def main() -> None:
             return
 
         incident_id = state["incident_id"]
-        print(f"Incident ID: {incident_id}\n")
+        print(f"Incident ID: {incident_id}")
+        print(f"Full report: {COORDINATOR_BASE}/incidents/{incident_id}/report\n")
         _print_triage(state["triage"])
         _print_diagnosis(state["diagnosis"])
         _print_plan(state["plan"])

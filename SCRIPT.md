@@ -18,11 +18,19 @@ tradeoffs) and `README.md` (setup/run instructions).
       keys/model are live and you're not debugging on camera).
 - [ ] Close any stray terminals bound to ports 8000-8004 (`Get-NetTCPConnection
       -LocalPort 8000,8001,8002,8003,8004` in PowerShell should return nothing).
+- [ ] Start n8n (`docker compose up -d`, then http://localhost:5679), import
+      `n8n/incident_response_workflow.json` if you haven't already (the "..."
+      menu → *Import from file...*), and **Publish** it so its webhook is live.
+      Set `N8N_ALERT_WEBHOOK_URL=http://localhost:5679/webhook/incident-alert`
+      in `.env` so the CLI demo routes its alert through n8n instead of
+      posting to the coordinator directly — no other command changes.
 - [ ] Terminal font size large enough to read on a recording (14-16pt+).
 - [ ] Have these open in tabs, ready to alt-tab to: `ARCHITECTURE.md` (rendered
       preview, e.g. in VS Code or on GitHub, so the Mermaid diagrams render),
-      a terminal at the repo root with the venv activated, and your LangSmith
-      project page (smith.langchain.com → your `incident-response-adk` project).
+      a terminal at the repo root with the venv activated, your n8n instance
+      (localhost:5679, Executions tab), the coordinator's live dashboard
+      (localhost:8000/dashboard), and your LangSmith project page
+      (smith.langchain.com → your `incident-response-adk` project).
 - [ ] Quiet room, mic close, no notifications popping up. **[Rubric: production
       quality — clear audio, legible screen, good pacing]**
 
@@ -112,7 +120,7 @@ curl http://localhost:8001/.well-known/agent-card.json
 
 ---
 
-## 4. Demo run #1 — full incident, live reasoning, HITL (3:15–7:00)
+## 4. Demo run #1 — alert via n8n, live reasoning, HITL (3:15–7:15)
 **[Rubric: demo quality — end-to-end, agent interactions, HITL checkpoint]**
 
 **[ACTION: new terminal, repo root]**
@@ -121,35 +129,52 @@ curl http://localhost:8001/.well-known/agent-card.json
 python -m incident_response.run_incident --no-spawn --scenario checkout-latency-spike
 ```
 
-> "This scenario simulates a checkout-service latency and error spike. I'm
-> running it interactively this time — no auto-approve — so you can see the
-> human decision happen live, not scripted."
+> "This scenario simulates a checkout-service latency and error spike. Notice
+> I haven't changed this command at all — but because I pointed
+> `N8N_ALERT_WEBHOOK_URL` at my n8n instance, this alert is actually filed
+> through n8n first, not straight to the coordinator. Let me show you that
+> alert as n8n receives it."
 
-**[ACTION: let the Monitoring Agent's triage output print]**
+**[ACTION: switch to the n8n tab, Executions list, click the newest (top)
+execution, click the "Alert Webhook" node]**
 
-> "That's the Monitoring Agent — it called two tools, got a metrics snapshot
-> and recent logs, flagged three anomalous metrics, and it's a live Gemini
-> call, not canned text."
+> "Here's the incoming alert exactly as n8n received it — headers, and the
+> body: `scenario_id: checkout-latency-spike`. n8n then computes a
+> notification channel from severity once triage comes back, acks the alert
+> source, and polls in the background until a human decides — you can see
+> that loop right here in the execution graph."
 
-**[ACTION: let the Diagnostic Agent's output print — pause here]**
+**[ACTION: switch to the dashboard tab, http://localhost:8000/dashboard —
+click into the incident that just appeared]**
 
-> "This scenario also has a simulated failure baked in: the log API times out
-> once. Watch — [point at the data_gaps / unresolved_uncertainty line] — the
-> agent doesn't crash, it records the gap explicitly, lowers its confidence,
-> and reasons around it. That's the first layer of error handling: the LLM
-> itself adapting to a failed tool call inside its own reasoning, via an
-> `on_tool_error_callback`. It still lands on the right root cause — the
-> payment-gateway dependency timing out — and cites the matching past incident
-> from the knowledge base."
+> "And this is the coordinator's live incident report — it updates in real
+> time as each agent finishes, so let's just watch it fill in instead of
+> scrolling a terminal."
 
-**[ACTION: let the Remediation Agent's plan print]**
+**[ACTION: let the Triage card render]**
+
+> "Monitoring Agent — it called two tools, got a metrics snapshot and recent
+> logs, flagged three anomalous metrics. Live Gemini call, not canned text."
+
+**[ACTION: let the Diagnosis card render — pause on the data-gaps line]**
+
+> "This scenario has a simulated failure baked in: the log API times out
+> once. Watch — the agent doesn't crash, it records the gap explicitly,
+> lowers its confidence, and reasons around it. That's the LLM itself
+> adapting to a failed tool call mid-reasoning, via an `on_tool_error_callback`.
+> It still lands on the right root cause — the payment-gateway dependency
+> timing out — and cites the matching past incident from the knowledge base,
+> right there in the hypothesis card."
+
+**[ACTION: let the Remediation Plan card render]**
 
 > "The Remediation Agent doesn't propose one action — it builds a goal
 > hierarchy: 'Immediate mitigation' with the fastest safe fix, and 'Preventive
-> follow-up' for the underlying cause, each step with a risk rating and an
+> follow-up' for the underlying cause, each step with a risk badge and an
 > explicit rollback plan."
 
-**[ACTION: the HITL prompt appears — `Approve / Reject / Modify goal? [a/r/m]:`]**
+**[ACTION: switch back to your terminal — the HITL prompt has appeared:
+`Approve / Reject / Modify goal? [a/r/m]:`]**
 
 > "And now it stops. Nothing has executed yet. This is the human-in-the-loop
 > checkpoint, and I want to show it's not a rubber stamp — instead of just
@@ -166,21 +191,17 @@ Your name: <your name>
 > "I just told it to run 'Preventive follow-up' instead of what it
 > recommended."
 
-**[ACTION: let execution results print]**
+**[ACTION: switch back to the dashboard tab, let it refresh]**
 
-> "And there — it executed the *steps from the goal I picked*, not the
-> agent's recommendation. That's a genuine behavior change from a human
-> decision, which is the bar for a meaningful HITL checkpoint, not a
-> confirmation dialog."
-
-**[ACTION: let the postmortem print]**
-
-> "Postmortem Agent closes it out — root cause, impact, and critically, it
-> records exactly what I decided and why, so that decision is auditable."
+> "And there in the Execution section — it ran the *steps from the goal I
+> picked*, not the agent's recommendation. That's a genuine behavior change
+> from a human decision, which is the bar for a meaningful HITL checkpoint,
+> not a confirmation dialog. And the Postmortem section records exactly what
+> I decided and why, so that decision stays auditable."
 
 ---
 
-## 5. Edge case — kill an agent mid-flight (7:00–8:15)
+## 5. Edge case — kill an agent mid-flight (7:15–8:30)
 **[Rubric: demo quality — handling of at least one failure/edge case]**
 
 > "That first run already showed one failure mode — a tool timing out and the
@@ -202,7 +223,8 @@ python -m incident_response.run_incident --no-spawn --scenario auth-cert-expiry 
 
 > "I'll auto-approve this one so we get straight to the interesting part."
 
-**[ACTION: let it run — point at the Diagnostic Agent section]**
+**[ACTION: let it run in the terminal, then flip back to the dashboard tab and
+refresh — point at the red "Coordinator resilience events" box at the top]**
 
 > "There — the coordinator tried to reach the Diagnostic Agent over A2A,
 > retried once, couldn't connect, and fell back to calling the same
@@ -221,25 +243,20 @@ python -m incident_response.a2a_server diagnostic
 
 ---
 
-## 6. Observability — LangSmith & n8n (8:15–9:15)
+## 6. Observability — LangSmith (8:15–9:00)
 **[Rubric: observability, framework selection]**
 
 **[ACTION: switch to your browser, LangSmith project page]**
 
-> "Every stage you just watched print to the terminal is also a traced span
+> "Everything you just watched render on the dashboard is also a traced span
 > in LangSmith — triage, diagnosis, remediation planning, execution,
 > postmortem — nested under one run per incident, tagged with the incident
 > ID. [click into the most recent trace] Here's the run from the checkout
 > incident — you can see the modify decision, the retry, all of it, fully
-> inspectable after the fact."
-
-**[ACTION: switch to n8n, if you have it running, or the workflow JSON in your editor]**
-
-> "And this is the n8n side — alert intake, severity-based routing to a
-> notification channel, and a poll loop that waits for the human decision
-> before sending a completion notification. It's decoupled from the
-> reasoning entirely; the coordinator API works identically whether n8n is in
-> front of it or not."
+> inspectable after the fact. And this is decoupled from n8n entirely — the
+> coordinator API and its tracing work identically whether n8n is in front of
+> it or you're posting directly, which is what let me build and test most of
+> this without n8n running at all."
 
 ---
 
@@ -270,15 +287,17 @@ python -m incident_response.a2a_server diagnostic
 | Cold open | 0:30 | 0:30 |
 | Architecture | 2:15 | 2:45 |
 | Launch system | 0:30 | 3:15 |
-| Demo #1 (full run + HITL modify) | 3:45 | 7:00 |
-| Edge case (kill agent process) | 1:15 | 8:15 |
-| LangSmith / n8n | 1:00 | 9:15 |
+| Demo #1 (n8n trigger + live dashboard + HITL modify) | 4:00 | 7:15 |
+| Edge case (kill agent process) | 1:15 | 8:30 |
+| LangSmith | 0:45 | 9:15 |
 | Wrap-up | 0:45 | 10:00 |
 
-**If you're running long:** cut the n8n portion first (LangSmith alone still
-satisfies observability) and tighten the architecture section to just the
-sequence diagram + the coordination-model tradeoff — those are the two
-highest-value talking points for the rubric.
+**If you're running long:** trim the n8n Executions-tab detour in §4 to just
+the Alert Webhook node (skip walking the rest of its graph) — the live
+dashboard is doing most of the demonstration work at that point anyway. Or
+tighten the architecture section to just the sequence diagram + the
+coordination-model tradeoff — those are the two highest-value talking points
+for the rubric.
 
 **If you're running short / want more depth:** show the saved
 `runs/<incident_id>.json` record for the modified-goal incident, or open

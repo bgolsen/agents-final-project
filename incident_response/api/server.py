@@ -11,15 +11,21 @@ human calls `POST /incidents/{id}/decision`.
     GET  /approvals/{id}                  poll target for n8n's Wait node
     POST /incidents/{id}/decision         the HITL checkpoint
     POST /notify                          mock notification sink (n8n -> here)
+    GET  /dashboard                       human-readable live view of all incidents
+    GET  /incidents/{id}/report           human-readable live view of one incident
+                                           (every agent's reasoning, HITL decision,
+                                           execution, postmortem -- auto-refreshes
+                                           while the incident is still in flight)
 """
 from __future__ import annotations
 
 import asyncio
-from typing import Literal
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 
+from incident_response.api.report import render_dashboard_html, render_incident_html
 from incident_response.coordinator import (
     IncidentState,
     new_incident,
@@ -57,6 +63,21 @@ def _get_or_404(incident_id: str) -> IncidentState:
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok"}
+
+
+@app.get("/")
+async def root() -> RedirectResponse:
+    return RedirectResponse(url="/dashboard")
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard() -> str:
+    return render_dashboard_html(list(_incidents.values()))
+
+
+@app.get("/incidents/{incident_id}/report", response_class=HTMLResponse)
+async def incident_report(incident_id: str) -> str:
+    return render_incident_html(_get_or_404(incident_id))
 
 
 @app.get("/scenarios")

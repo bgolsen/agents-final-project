@@ -1,0 +1,26 @@
+# Runs a dedicated n8n instance for this project on port 5679 (not n8n's
+# usual 5678), so it never collides with any other n8n instance you might
+# already have running. `docker compose up -d` to start, `docker compose
+# down` to stop (add `-v` to also wipe its workflows/credentials).
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: incident-response-n8n
+    restart: unless-stopped
+    ports:
+      - "5679:5678"
+    environment:
+      # n8n listens on its normal default port (5678) *inside* the container;
+      # only the host-side mapping is 5679. WEBHOOK_URL tells n8n what its
+      # externally-reachable address actually is, so the webhook URLs it
+      # displays/generates in the UI are correct (don't set N8N_PORT here --
+      # that collides with n8n's internal task-broker port).
+      - WEBHOOK_URL=http://localhost:5679/
+      - N8N_SECURE_COOKIE=false
+      - GENERIC_TIMEZONE=UTC
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n:/workflows:ro
+
+volumes:
+  n8n_data:
