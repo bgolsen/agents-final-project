@@ -52,7 +52,7 @@ python -m incident_response.run_incident
 ```
 
 This starts the 4 specialist A2A servers (ports 8001-8004) and the coordinator
-API (port 8000) as subprocesses, lets you pick one of 3 canned incident
+API (port 8110) as subprocesses, lets you pick one of 3 canned incident
 scenarios, runs triage → diagnosis → planning, prints each agent's structured
 output, **stops and prompts you** to approve/reject/modify the remediation plan
 (the HITL checkpoint), then executes and prints the post-mortem. Processes are
@@ -82,7 +82,7 @@ different simulated failure so you can see error handling in action:
 
 Terminal output only shows so much. While the system is running (via either
 `run_incident.py` or the n8n workflow below), open
-**http://localhost:8000/dashboard** in a browser — it lists every incident the
+**http://localhost:8110/dashboard** in a browser — it lists every incident the
 coordinator has handled this session, live, and auto-refreshes while any of
 them are still in flight. Click into one for the full report at
 `/incidents/{id}/report`: each agent's actual structured output (triage
@@ -104,7 +104,7 @@ python -m incident_response.a2a_server monitoring     # :8001
 python -m incident_response.a2a_server diagnostic      # :8002
 python -m incident_response.a2a_server remediation     # :8003
 python -m incident_response.a2a_server postmortem      # :8004
-python -m incident_response.api                        # :8000 (coordinator + HITL API)
+python -m incident_response.api                        # :8110 (coordinator + HITL API)
 
 # then drive it with curl, or:
 python -m incident_response.run_incident --no-spawn
@@ -148,10 +148,10 @@ right) so its production webhook is always listening — without publishing,
 n8n only listens for one call at a time in "test" mode.
 
 **Verified working config:** the workflow's `Config` node already points
-`coordinator_base` at `http://host.docker.internal:8000` — required because
+`coordinator_base` at `http://host.docker.internal:8110` — required because
 n8n runs inside Docker, where `localhost` refers to the *container*, not your
 host machine where the coordinator API actually listens. (This was confirmed
-by actually running it: pointing it at `localhost:8000` fails with
+by actually running it: pointing it at `localhost:8110` fails with
 "the service refused the connection" on the `Start Incident` node — a good
 one to know about if you ever repoint it.)
 

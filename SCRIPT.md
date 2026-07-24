@@ -16,8 +16,8 @@ tradeoffs) and `README.md` (setup/run instructions).
 - [ ] `.env` has a working `GOOGLE_API_KEY` and `LANGSMITH_API_KEY` (confirm by
       running one incident end-to-end beforehand, off-camera, so you know the
       keys/model are live and you're not debugging on camera).
-- [ ] Close any stray terminals bound to ports 8000-8004 (`Get-NetTCPConnection
-      -LocalPort 8000,8001,8002,8003,8004` in PowerShell should return nothing).
+- [ ] Close any stray terminals bound to ports 8110,8001,8002,8003,8004 (`Get-NetTCPConnection
+      -LocalPort 8110,8001,8002,8003,8004` in PowerShell should return nothing).
 - [ ] Start n8n (`docker compose up -d`, then http://localhost:5679), import
       `n8n/incident_response_workflow.json` if you haven't already (the "..."
       menu → *Import from file...*), and **Publish** it so its webhook is live.
@@ -29,7 +29,7 @@ tradeoffs) and `README.md` (setup/run instructions).
       preview, e.g. in VS Code or on GitHub, so the Mermaid diagrams render),
       a terminal at the repo root with the venv activated, your n8n instance
       (localhost:5679, Executions tab), the coordinator's live dashboard
-      (localhost:8000/dashboard), and your LangSmith project page
+      (localhost:8110/dashboard), and your LangSmith project page
       (smith.langchain.com → your `incident-response-adk` project).
 - [ ] Quiet room, mic close, no notifications popping up. **[Rubric: production
       quality — clear audio, legible screen, good pacing]**
@@ -144,7 +144,7 @@ execution, click the "Alert Webhook" node]**
 > source, and polls in the background until a human decides — you can see
 > that loop right here in the execution graph."
 
-**[ACTION: switch to the dashboard tab, http://localhost:8000/dashboard —
+**[ACTION: switch to the dashboard tab, http://localhost:8110/dashboard —
 click into the incident that just appeared]**
 
 > "And this is the coordinator's live incident report — it updates in real

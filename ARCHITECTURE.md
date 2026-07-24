@@ -129,7 +129,7 @@ flowchart LR
         REM[Remediation Agent :8003]
         POST[Postmortem Agent :8004]
     end
-    COORD[Coordinator API :8000\nFastAPI + rule-based orchestration]
+    COORD[Coordinator API :8110\nFastAPI + rule-based orchestration]
     N8N[n8n workflow\nintake / routing / HITL poll]
     HUMAN((Human reviewer))
     LS[(LangSmith\ntrace tree)]

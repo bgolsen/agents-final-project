@@ -15,7 +15,7 @@ $agentPorts = @{ monitoring = 8001; diagnostic = 8002; remediation = 8003; postm
 foreach ($agent in $agentPorts.Keys) {
     Start-TitledAgent -Title "Agent: $agent (:$($agentPorts[$agent]))" -ArgsLine "-m incident_response.a2a_server $agent"
 }
-Start-TitledAgent -Title "Coordinator API (:8000)" -ArgsLine "-m incident_response.api"
+Start-TitledAgent -Title "Coordinator API (:8110)" -ArgsLine "-m incident_response.api"
 
-Write-Host "Started monitoring(8001), diagnostic(8002), remediation(8003), postmortem(8004) agents and coordinator API(8000), each in a titled window."
+Write-Host "Started monitoring(8001), diagnostic(8002), remediation(8003), postmortem(8004) agents and coordinator API(8110), each in a titled window."
 Write-Host "Run 'python -m incident_response.run_incident --no-spawn' to start a demo incident against them."

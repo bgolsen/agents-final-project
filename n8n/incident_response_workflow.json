@@ -23,7 +23,7 @@
             {
               "id": "cfg-1",
               "name": "coordinator_base",
-              "value": "http://host.docker.internal:8000",
+              "value": "http://host.docker.internal:8110",
               "type": "string"
             },
             {

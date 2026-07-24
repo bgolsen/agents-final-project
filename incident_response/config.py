@@ -42,7 +42,7 @@ class Settings:
     postmortem_agent_port: int = _int("POSTMORTEM_AGENT_PORT", 8004)
 
     coordinator_host: str = os.getenv("COORDINATOR_HOST", "127.0.0.1")
-    coordinator_port: int = _int("COORDINATOR_PORT", 8000)
+    coordinator_port: int = _int("COORDINATOR_PORT", 8110)
 
     chaos_mode: bool = _bool("CHAOS_MODE", True)
 
