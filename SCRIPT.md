@@ -22,8 +22,11 @@ tradeoffs) and `README.md` (setup/run instructions).
       `n8n/incident_response_workflow.json` if you haven't already (the "..."
       menu → *Import from file...*), and **Publish** it so its webhook is live.
       Set `N8N_ALERT_WEBHOOK_URL=http://localhost:5679/webhook/incident-alert`
-      in `.env` so the CLI demo routes its alert through n8n instead of
-      posting to the coordinator directly — no other command changes.
+      in `.env` so §5's `run_incident.py` call also routes through n8n
+      (§4 triggers n8n directly with `curl` — see below).
+- [ ] Do one full practice run of §4's HITL form (fill it in, submit Modify)
+      before recording, so the field layout/dropdown/button positions are
+      familiar and you're not hunting for them live.
 - [ ] Terminal font size large enough to read on a recording (14-16pt+).
 - [ ] Have these open in tabs, ready to alt-tab to: `ARCHITECTURE.md` (rendered
       preview, e.g. in VS Code or on GitHub, so the Mermaid diagrams render),
@@ -108,8 +111,14 @@ still tell them apart for §5.]**
 > "Five separate windows, five separate OS processes. Let me prove that —
 > here's the Monitoring Agent's A2A agent card, over plain HTTP."
 
+**[Use `curl.exe` (the real curl binary), not bare `curl` — PowerShell aliases
+plain `curl`/`wget` to `Invoke-WebRequest`, which on a fresh Windows profile
+can throw a confusing "NonInteractive mode" error the first time it's used.
+`curl.exe` sidesteps that entirely. Same reasoning applies everywhere else in
+this script that calls curl.]**
+
 ```powershell
-curl http://localhost:8001/.well-known/agent-card.json
+curl.exe http://localhost:8001/.well-known/agent-card.json
 ```
 
 **[ACTION: point out the JSON response — `name`, `skills`, the tool descriptions]**
@@ -120,29 +129,38 @@ curl http://localhost:8001/.well-known/agent-card.json
 
 ---
 
-## 4. Demo run #1 — alert via n8n, live reasoning, HITL (3:15–7:15)
+## 4. Demo run #1 — alert via n8n, live reasoning, HITL in the dashboard (3:15–7:15)
 **[Rubric: demo quality — end-to-end, agent interactions, HITL checkpoint]**
 
-**[ACTION: new terminal, repo root]**
+**[ACTION: terminal, repo root]**
+
+> "Let's file a real incident, the way a real monitoring system would —
+> straight into n8n's webhook, not through a helper script."
+
+**[Use `Invoke-RestMethod`, not `curl -d`, for this one — curl.exe's argument
+quoting for a JSON body gets fought by PowerShell's own parser and can mangle
+the body; `Invoke-RestMethod` is the native, reliable way to POST JSON from
+PowerShell, and its table-formatted output reads better on camera anyway.]**
 
 ```powershell
-python -m incident_response.run_incident --no-spawn --scenario checkout-latency-spike
+Invoke-RestMethod -Method Post -Uri http://localhost:5679/webhook/incident-alert -ContentType "application/json" -Body '{"scenario_id":"checkout-latency-spike"}'
 ```
 
-> "This scenario simulates a checkout-service latency and error spike. Notice
-> I haven't changed this command at all — but because I pointed
-> `N8N_ALERT_WEBHOOK_URL` at my n8n instance, this alert is actually filed
-> through n8n first, not straight to the coordinator. Let me show you that
-> alert as n8n receives it."
+**[ACTION: point at the terminal response — it comes back immediately as a
+table: `incident_id`, `status: awaiting_approval`, `routed_to: pager-oncall`]**
+
+> "That response came back the moment routing finished — the incident is
+> already through triage, diagnosis, and planning by the time n8n acks it.
+> Let's see that alert as n8n actually received it."
 
 **[ACTION: switch to the n8n tab, Executions list, click the newest (top)
 execution, click the "Alert Webhook" node]**
 
 > "Here's the incoming alert exactly as n8n received it — headers, and the
-> body: `scenario_id: checkout-latency-spike`. n8n then computes a
-> notification channel from severity once triage comes back, acks the alert
-> source, and polls in the background until a human decides — you can see
-> that loop right here in the execution graph."
+> body: `scenario_id: checkout-latency-spike`. n8n computed a notification
+> channel from severity, acked the alert source, and is now polling in the
+> background until a human decides — you can see that loop right here in the
+> execution graph."
 
 **[ACTION: switch to the dashboard tab, http://localhost:8110/dashboard —
 click into the incident that just appeared]**
@@ -173,31 +191,33 @@ click into the incident that just appeared]**
 > follow-up' for the underlying cause, each step with a risk badge and an
 > explicit rollback plan."
 
-**[ACTION: switch back to your terminal — the HITL prompt has appeared:
-`Approve / Reject / Modify goal? [a/r/m]:`]**
+**[ACTION: scroll to section 4, "Human-in-the-loop decision" — the approval
+form is right there on the page: name, notes, a goal dropdown, three buttons]**
 
 > "And now it stops. Nothing has executed yet. This is the human-in-the-loop
-> checkpoint, and I want to show it's not a rubber stamp — instead of just
-> approving the recommended plan, I'm going to pick the *other* goal."
+> checkpoint — and notice there's no terminal involved at all. This incident
+> came in through n8n; there was never a CLI session prompting anyone. The
+> only way to act on it is right here on the page. I want to show it's not a
+> rubber stamp, so instead of just approving the recommended plan, I'm going
+> to pick the *other* goal."
 
-**[ACTION: type `m` for modify]**
+**[ACTION: type your name and a reason into the form, use the dropdown to
+select "Preventive follow-up", click "Modify & run selected goal"]**
 
-```
-Which goal should run instead?: Preventive follow-up
-Why are you changing the plan?: Want the root-cause fix now, not just the mitigation
-Your name: <your name>
-```
+> "I just told it, in the dropdown, to run 'Preventive follow-up' instead of
+> what it recommended, and submitted that."
 
-> "I just told it to run 'Preventive follow-up' instead of what it
-> recommended."
+**[ACTION: the form POSTs and redirects straight back to this same report
+page — let it reload]**
 
-**[ACTION: switch back to the dashboard tab, let it refresh]**
-
-> "And there in the Execution section — it ran the *steps from the goal I
-> picked*, not the agent's recommendation. That's a genuine behavior change
-> from a human decision, which is the bar for a meaningful HITL checkpoint,
-> not a confirmation dialog. And the Postmortem section records exactly what
-> I decided and why, so that decision stays auditable."
+> "That's a real page load, not a mocked interaction — the button posted to
+> the coordinator, the coordinator executed the goal I picked, and redirected
+> back here. And there in the Execution section — it ran the *steps from the
+> goal I picked*, not the agent's recommendation. That's a genuine behavior
+> change from a human decision, which is the bar for a meaningful HITL
+> checkpoint, not a confirmation dialog. The Human-in-the-loop section above
+> it now shows exactly who decided what and why, and the Postmortem section
+> folds that same decision into its own record, so it stays auditable."
 
 ---
 
