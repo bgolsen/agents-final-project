@@ -65,6 +65,22 @@ th { color: #9aa3b2; font-weight: 600; }
 details summary { cursor: pointer; color: #9aa3b2; font-size: 0.85rem; margin-top: 2rem; }
 pre.raw { background: #0b0c0e; border: 1px solid #262a31; border-radius: 8px; padding: 1rem; overflow-x: auto; font-size: 0.78rem; }
 .hitl-box { border: 1px dashed #e0a72e; border-radius: 8px; padding: 1rem 1.2rem; color: #e0c98f; }
+.hitl-box p { margin-top: 0; }
+.hitl-form label { display: block; font-size: 0.85rem; color: #c7cdd8; margin: 0.7rem 0 0.25rem; }
+.hitl-form input[type="text"], .hitl-form textarea, .hitl-form select {
+  width: 100%; background: #10131a; border: 1px solid #2a2f38; border-radius: 6px;
+  color: #e4e6eb; padding: 0.45rem 0.6rem; font-family: inherit; font-size: 0.9rem;
+}
+.hitl-form textarea { resize: vertical; }
+.hitl-buttons { display: flex; gap: 0.6rem; margin-top: 1rem; }
+.hitl-buttons button {
+  flex: 1; border: none; border-radius: 6px; padding: 0.6rem 1rem; font-size: 0.9rem;
+  font-weight: 700; cursor: pointer; color: #0b0c0e;
+}
+.hitl-buttons .btn-approve { background: #3fb56f; }
+.hitl-buttons .btn-modify { background: #e0a72e; }
+.hitl-buttons .btn-reject { background: #c15b5b; }
+.hitl-buttons button:hover { filter: brightness(1.1); }
 """
 
 
@@ -160,15 +176,41 @@ def _plan_section(plan) -> str:
 </div>"""
 
 
+def _hitl_form(state: IncidentState) -> str:
+    plan = state.plan
+    goal_options = "".join(
+        f'<option value="{_esc(g.goal)}"{" selected" if plan and g.goal == plan.ranked_recommendation else ""}>'
+        f'{_esc(g.goal)}{" (recommended)" if plan and g.goal == plan.ranked_recommendation else ""}</option>'
+        for g in (plan.goals if plan else [])
+    )
+    return f"""
+<div class="hitl-box">
+  <p><strong>Awaiting your decision.</strong> Nothing has executed yet.</p>
+  <form method="POST" action="/incidents/{state.incident_id}/decision-form" class="hitl-form">
+    <label>Your name
+      <input type="text" name="reviewer" required placeholder="e.g. grady">
+    </label>
+    <label>Notes (why -- shown in the postmortem)
+      <textarea name="notes" rows="2" placeholder="optional, but recommended"></textarea>
+    </label>
+    <label>Goal to run if you click Modify (Approve always uses the recommendation)
+      <select name="modified_goal">
+        {goal_options}
+      </select>
+    </label>
+    <div class="hitl-buttons">
+      <button type="submit" name="decision" value="approve" class="btn-approve">Approve</button>
+      <button type="submit" name="decision" value="modify" class="btn-modify">Modify &amp; run selected goal</button>
+      <button type="submit" name="decision" value="reject" class="btn-reject">Reject</button>
+    </div>
+  </form>
+</div>"""
+
+
 def _hitl_section(state: IncidentState) -> str:
     if state.decision is None:
         if state.status == "awaiting_approval":
-            return f"""
-<div class="hitl-box">
-  Awaiting human decision. Submit one to
-  <code>POST /incidents/{state.incident_id}/decision</code>
-  with <code>{{"decision": "approve|reject|modify", "reviewer": "...", "modified_goal": "..."}}</code>.
-</div>"""
+            return _hitl_form(state)
         return '<div class="card">not reached yet</div>'
     d = state.decision
     return f"""
@@ -229,7 +271,10 @@ def _resilience_notes(state: IncidentState) -> str:
 
 
 def render_incident_html(state: IncidentState) -> str:
-    refresh = "" if state.status in TERMINAL_STATUSES else '<meta http-equiv="refresh" content="3">'
+    # No auto-refresh once a human needs to act -- a timed reload would wipe
+    # out whatever they're mid-typing into the approval form below.
+    no_refresh_statuses = TERMINAL_STATUSES | {"awaiting_approval"}
+    refresh = "" if state.status in no_refresh_statuses else '<meta http-equiv="refresh" content="3">'
     status_color = STATUS_COLORS.get(state.status, "#5b8def")
     raw = html.escape(json.dumps(state.model_dump(), indent=2))
     return f"""<!doctype html>

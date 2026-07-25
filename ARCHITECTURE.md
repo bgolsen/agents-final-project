@@ -78,7 +78,12 @@ renders every agent's actual structured output -- the diagnostic
 decomposition and ranked hypotheses with cited evidence, the remediation
 goal/step plan, the HITL decision, execution results, the postmortem -- and
 auto-refreshes while the incident is still in flight, since it reads the same
-mutable `IncidentState` object the coordinator is actively updating.
+mutable `IncidentState` object the coordinator is actively updating. The
+dashboard lists every incident the coordinator has ever handled (it reloads
+`runs/*.json` on startup, so history survives restarts), and the HITL
+checkpoint itself is submittable from the report page's own form -- not just
+from a curl call or the CLI's terminal prompt -- since an incident filed
+through n8n or curl has no terminal to prompt in the first place.
 
 **Why not CrewAI or LangGraph too?** Two frameworks were required; four were used
 because each targets a different concern (agent runtime, wire protocol, external

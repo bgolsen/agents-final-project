@@ -82,19 +82,32 @@ different simulated failure so you can see error handling in action:
 
 Terminal output only shows so much. While the system is running (via either
 `run_incident.py` or the n8n workflow below), open
-**http://localhost:8110/dashboard** in a browser — it lists every incident the
-coordinator has handled this session, live, and auto-refreshes while any of
-them are still in flight. Click into one for the full report at
+**http://localhost:8110/dashboard** in a browser — it lists **every incident
+the coordinator has ever handled**, not just the current one: on startup the
+coordinator reloads every `runs/<incident_id>.json` it has saved, so history
+survives restarts, with each one's status (`awaiting_approval`, `closed`,
+`rejected`, ...) color-coded and the list auto-refreshing while any incident
+is still in flight. Click into one for the full report at
 `/incidents/{id}/report`: each agent's actual structured output (triage
 anomalies, the diagnostic agent's sub-question decomposition and ranked
 hypotheses with cited evidence and confidence, the remediation goal/step
-plan with risk and rollback, the HITL decision and who made it and why, the
-execution log, the postmortem) rendered as readable HTML, with a raw-JSON
-toggle at the bottom for the full record. This page updates in real time as
-each agent finishes — leave it open during a live demo and watch each
-section fill in — because the coordinator mutates the same in-memory
-`IncidentState` object that the page reads, so progress is visible mid-run,
-not just after the incident closes.
+plan with risk and rollback, the execution log, the postmortem) rendered as
+readable HTML, with a raw-JSON toggle at the bottom for the full record. This
+page updates in real time as each agent finishes — leave it open during a
+live demo and watch each section fill in — because the coordinator mutates
+the same in-memory `IncidentState` object that the page reads, so progress
+is visible mid-run, not just after the incident closes.
+
+**The HITL checkpoint itself lives on this page, not just in a terminal.**
+When an incident reaches `awaiting_approval`, the report page shows an actual
+form — your name, notes, a dropdown of which goal to run if you modify — with
+Approve / Modify / Reject buttons that post straight to the coordinator and
+redirect back to the (now-updated) report. This is the only way to act on an
+incident that wasn't started from `run_incident.py`'s interactive prompt —
+e.g. anything filed through n8n or curl — since the dashboard has no
+terminal to prompt in. (The page intentionally stops auto-refreshing while
+a decision is pending, so a timed reload can't wipe out what you're
+mid-typing.)
 
 ## Run the pieces individually
 
@@ -120,10 +133,11 @@ Coordinator API surface (also used by n8n):
 | `POST /incidents` `{"scenario_id": "..."}` | runs triage→diagnosis→planning, returns state at `awaiting_approval` |
 | `GET /incidents/{id}` | full incident state |
 | `GET /approvals/{id}` | lightweight poll target (used by n8n's Wait loop) |
-| `POST /incidents/{id}/decision` `{"decision": "approve\|reject\|modify", "reviewer": "...", "modified_goal": "..."}` | the HITL checkpoint |
+| `POST /incidents/{id}/decision` `{"decision": "approve\|reject\|modify", "reviewer": "...", "modified_goal": "..."}` | the HITL checkpoint (JSON; used by n8n/curl) |
+| `POST /incidents/{id}/decision-form` (HTML form fields) | the HITL checkpoint (used by the dashboard's Approve/Modify/Reject buttons; redirects back to the report page) |
 | `POST /notify` | mock notification sink (stands in for Slack/PagerDuty) |
-| `GET /dashboard` | human-readable live list of all incidents (see above) |
-| `GET /incidents/{id}/report` | human-readable live view of one incident |
+| `GET /dashboard` | human-readable live list of every incident, including past ones reloaded from `runs/` on startup |
+| `GET /incidents/{id}/report` | human-readable live view of one incident, including the HITL form when applicable |
 
 ## n8n workflow (alerting & routing)
 
