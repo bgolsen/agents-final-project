@@ -96,14 +96,16 @@ graph.
 
 ```mermaid
 sequenceDiagram
-    participant N8N as n8n (alert intake/routing)
-    participant API as Coordinator API (FastAPI)
-    participant MON as Monitoring Agent (A2A :8001)
-    participant DIAG as Diagnostic Agent (A2A :8002)
-    participant REM as Remediation Agent (A2A :8003)
-    participant HUMAN as Human reviewer
-    participant POST as Postmortem Agent (A2A :8004)
+    participant SRC as Alert source (monitoring/curl)
+    participant N8N as n8n workflow
+    participant API as Coordinator API
+    participant MON as Monitoring Agent
+    participant DIAG as Diagnostic Agent
+    participant REM as Remediation Agent
+    participant POST as Postmortem Agent
+    participant HUMAN as Human reviewer (dashboard)
 
+    SRC->>N8N: POST /webhook/incident-alert
     N8N->>API: POST /incidents {scenario_id}
     API->>MON: A2A call: triage(alert)
     MON-->>API: TriageReport
@@ -112,9 +114,13 @@ sequenceDiagram
     API->>REM: A2A call: plan(DiagnosticReport)
     REM-->>API: RemediationPlan (goal -> steps)
     API-->>N8N: 200 OK, status=awaiting_approval
-    N8N->>N8N: route notification by severity
-    N8N->>API: GET /approvals/{id} (poll)
-    HUMAN->>API: POST /incidents/{id}/decision {approve|reject|modify}
+    N8N->>N8N: compute routing channel by severity
+    N8N->>API: POST /notify (routed alert summary)
+    N8N-->>SRC: 200 OK {incident_id, status, routed_to}
+    loop every 5s until resolved
+        N8N->>API: GET /approvals/{id}
+    end
+    HUMAN->>API: POST /incidents/{id}/decision-form (approve/reject/modify)
     alt approved or modified
         API->>API: execute_remediation() with retry
     else rejected
@@ -122,9 +128,18 @@ sequenceDiagram
     end
     API->>POST: A2A call: postmortem(full trace + decision)
     POST-->>API: PostmortemDoc
-    API-->>N8N: status=closed|rejected
-    N8N->>N8N: notify completion
+    N8N->>API: GET /approvals/{id} (sees closed/rejected)
+    N8N->>API: POST /notify (completion summary)
 ```
+
+n8n's role doesn't end at the first arrow: it computes the routing channel from
+severity, sends that as a notification, acks whoever originally called its
+webhook (which may not even still be waiting -- that ack happens before the
+human has decided anything), keeps polling in the background until a decision
+lands, and sends a final notification once it does. The human never goes
+through n8n at all -- the HITL decision is made directly against the
+coordinator's own dashboard, and n8n just observes the outcome via polling,
+same as it would for an incident nobody happened to be watching in a browser.
 
 ```mermaid
 flowchart LR
@@ -134,14 +149,20 @@ flowchart LR
         REM[Remediation Agent :8003]
         POST[Postmortem Agent :8004]
     end
+    SRC([Alert source\nmonitoring / curl])
+    N8N[n8n workflow\nroute, ack, poll, notify]
     COORD[Coordinator API :8110\nFastAPI + rule-based orchestration]
-    N8N[n8n workflow\nintake / routing / HITL poll]
-    HUMAN((Human reviewer))
+    HUMAN((Human reviewer\nvia dashboard))
     LS[(LangSmith\ntrace tree)]
     KB[(knowledge_base.json\npast incidents)]
     TEL[(simulated telemetry\n+ chaos injection)]
 
-    N8N -- alert --> COORD
+    SRC -- alert --> N8N
+    N8N -- "POST /incidents" --> COORD
+    COORD -- "200 OK" --> N8N
+    N8N -- "ack + routed notify" --> SRC
+    N8N -. "poll /approvals" .-> COORD
+    N8N -. "completion notify" .-> SRC
     COORD -- A2A --> MON
     COORD -- A2A --> DIAG
     COORD -- A2A --> REM
@@ -150,8 +171,7 @@ flowchart LR
     DIAG --- TEL
     DIAG --- KB
     REM --- KB
-    COORD -- HITL gate --> HUMAN
-    HUMAN -- approve/reject/modify --> COORD
+    HUMAN -- "decision form" --> COORD
     COORD -. traces .-> LS
 ```
 
