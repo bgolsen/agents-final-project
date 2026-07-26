@@ -16,7 +16,7 @@ plan a risk-ranked remediation, stop for **human approval**, execute the
 approved plan, and write a post-mortem. **n8n** fronts the system for alert
 intake/routing; **LangSmith** traces the full reasoning chain.
 
-Demo video: `<add your unlisted YouTube/Loom link here before submitting>`
+Demo video: [Final Agentic AI Project Demo by Grady Olsen — Recording.mp4](<./Final Agentic AI Project Demo by Grady Olsen - Recording.mp4>) (recorded walkthrough, ~10 min)
 
 ## Prerequisites
 
